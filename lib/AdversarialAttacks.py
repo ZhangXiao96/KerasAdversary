@@ -46,7 +46,7 @@ class WhiteBoxAttacks(object):
     def get_sess(self):
         return self.sess
 
-    def _get_gradients(self, x_batch, y_batch):
+    def _get_batch_gradients(self, x_batch, y_batch):
         feed_dict = {
             self.input_tensor: x_batch,
             self.target_tensor: y_batch,
@@ -54,6 +54,51 @@ class WhiteBoxAttacks(object):
         }
         gradient_batch = self.sess.run(self.gradient_tensor, feed_dict=feed_dict)
         return gradient_batch
+
+    def get_gradients(self, x, y, batch_size=256):
+        """
+        This function is used to get the gradients \Delta_{x}Loss(x,y;\theta)
+        :param x: the normal examples
+        :param y: the labels of x
+        :param batch_size: batch size
+        :return: gradients
+        """
+        K.set_learning_phase(0)
+        gradients = []
+        data = zip(x, y)
+        batches = list(utils.batch_iter(data, batchsize=batch_size, shuffle=False))
+        for batch in tqdm(batches):
+            x_batch, y_batch = zip(*batch)
+            gradient_batch = self._get_batch_gradients(x_batch=x_batch, y_batch=y_batch)
+            gradients.append(gradient_batch)
+        gradients = np.concatenate(gradients, axis=0)
+        return gradients
+
+    def ag(self, x, y, epsilon=0.1, ord=2, batch_size=256, clip_min=None, clip_max=None):
+        """
+        Add Gradients (ag).
+        Just add the gradients whose ord norm is epsilon (fixed).
+        :param x: the normal examples
+        :param y: the labels of x
+        :param epsilon: the limit of the norm of the gradient.
+        :param ord: the ord of the norm
+        :param batch_size: batch size
+        :param clip_min: minimum input component value. If `None`, clipping is not performed on lower
+        interval edge.
+        :param clip_max: maximum input component value. If `None`, clipping is not performed on upper
+        interval edge.
+        :return: adversarial examples of x.
+        """
+        K.set_learning_phase(0)
+        gradients = self.get_gradients(x, y, batch_size=batch_size)
+        adv_flat = np.reshape(gradients, newshape=[gradients.shape[0], -1])
+        norms = np.linalg.norm(adv_flat, ord=ord, axis=1, keepdims=True)
+
+        adv_noise = np.reshape(epsilon * adv_flat / norms, newshape=gradients.shape)
+        adv_x = x + adv_noise
+        if clip_min is not None or clip_max is not None:
+            adv_x = np.clip(adv_x, a_min=clip_min, a_max=clip_max)
+        return adv_x
 
     def fgsm(self, x, y, epsilon=0.1, batch_size=256, clip_min=None, clip_max=None):
         """
@@ -80,16 +125,11 @@ class WhiteBoxAttacks(object):
         :return: adversarial examples of x.
         """
         K.set_learning_phase(0)
-        gradients = []
-        data = zip(x, y)
-        batches = list(utils.batch_iter(data, batchsize=batch_size, shuffle=False))
-        for batch in tqdm(batches):
-            x_batch, y_batch = zip(*batch)
-            gradient_batch = self._get_gradients(x_batch=x_batch, y_batch=y_batch)
-            gradients.append(gradient_batch)
-        adv_noise = epsilon * np.sign(np.concatenate(gradients, axis=0))
+        gradients = self.get_gradients(x, y, batch_size=batch_size)
+        adv_noise = epsilon * np.sign(gradients)
         adv_x = x + adv_noise
-        adv_x = np.clip(adv_x, a_min=clip_min, a_max=clip_max)
+        if clip_min is not None or clip_max is not None:
+            adv_x = np.clip(adv_x, a_min=clip_min, a_max=clip_max)
         return adv_x
 
     def bim(self, x, y, epsilon=0.1, iterations=3, batch_size=256, clip_min=None, clip_max=None):
