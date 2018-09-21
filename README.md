@@ -1,8 +1,8 @@
-#KerasAdversary#
+# KerasAdversary #
 
 This library provides several simple but powerful interfaces on adversarial attacks.
 
-##Dependencies##
+## Dependencies ##
 
 This library is mainly designed to attack the target models built with **Keras**. However, RNN is not supported now.
 
@@ -14,11 +14,11 @@ To use our library in your project, several libraries are pre-requisites:
 - **matplotlib** (to support visual functions in our library)
 - **numpy** (to support matrix calculation)
 
-##Introductions##
+## Introductions ##
 
 All the files can be found in the folder *lib/*.
 
-###AdversarialAttacks.py###
+### AdversarialAttacks.py ###
 
 This file mainly contains several classes for adversarial attacks.
 
@@ -37,10 +37,10 @@ Adversarial attack can be quite simple with our library. For example, if *model*
 
 where *adv_x* are adversarial examples of x.
 
-###visualization.py###
+### visualization.py ###
 
 This file contains several methods for visualizations.
 
-###utils.py###
+### utils.py ###
 
 This file contains several useful methods that you may use in your project.
