@@ -41,6 +41,16 @@ where *adv_x* are adversarial examples of x.
 
 This file contains several methods for visualizations.
 
+Here are some examples:
+
+1. **mnist**
+
+	![](https://github.com/ZhangXiao96/KerasAdversary/blob/master/pic/mnist_adv.jpg)
+
+2. **cifar10**
+
+	![](https://github.com/ZhangXiao96/KerasAdversary/blob/master/pic/cifar10_adv.jpg)
+
 ### utils.py ###
 
 This file contains several useful methods that you may use in your project.
