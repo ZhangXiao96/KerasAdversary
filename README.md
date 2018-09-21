@@ -30,9 +30,9 @@ Now all the attack algorithms are for target attacks.
 
 Adversarial attack can be quite simple with our library. For example, if *model* is the target model built with Keras, then it can be attacked by FGSM with the following commands:
 	
-	from lib.AdversarialAttacks import DLWhiteBoxAttacks
+	from lib.AdversarialAttacks import WhiteBoxAttacks
 	import keras.backen as K	
-	AttackAgent = DLWhiteBoxAttacks(model, K.get_session())
+	AttackAgent = WhiteBoxAttacks(model, K.get_session())
 	adv_x = AttackAgent.fgsm(x, y, epsilon=0.1, clip_min=0., clip_max=1.)
 
 where *adv_x* are adversarial examples of x.
