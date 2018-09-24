@@ -1,5 +1,4 @@
 """
-Last updated: 2018.09.14
 This file is used to perform some adversarial attack methods on the deep learning models built with Keras.
 Now involve:
     white-box attack:
@@ -53,6 +52,7 @@ class WhiteBoxAttacks(object):
             self._sample_weights: np.ones((len(y_batch),))
         }
         gradient_batch = self.sess.run(self.gradient_tensor, feed_dict=feed_dict)
+        gradient_batch = len(y_batch) * gradient_batch  # To remove 1/Batchsize before the loss
         return gradient_batch
 
     def get_gradients(self, x, y, batch_size=256):
@@ -74,14 +74,14 @@ class WhiteBoxAttacks(object):
         gradients = np.concatenate(gradients, axis=0)
         return gradients
 
-    def ag(self, x, y, epsilon=0.1, ord=2, batch_size=256, clip_min=None, clip_max=None):
+    def ag(self, x, y, epsilon=0.1, norm_ord=None, batch_size=256, clip_min=None, clip_max=None):
         """
         Add Gradients (ag).
         Just add the gradients whose ord norm is epsilon (fixed).
         :param x: the normal examples
         :param y: the labels of x
         :param epsilon: the limit of the norm of the gradient.
-        :param ord: the ord of the norm
+        :param norm_ord: the ord of the norm. If is None, the gradients will not be normalized.
         :param batch_size: batch size
         :param clip_min: minimum input component value. If `None`, clipping is not performed on lower
         interval edge.
@@ -91,12 +91,15 @@ class WhiteBoxAttacks(object):
         """
         K.set_learning_phase(0)
         gradients = self.get_gradients(x, y, batch_size=batch_size)
-        adv_flat = np.reshape(gradients, newshape=[gradients.shape[0], -1])
-        norms = np.linalg.norm(adv_flat, ord=ord, axis=1, keepdims=True)
 
-        adv_noise = np.reshape(epsilon * adv_flat / norms, newshape=gradients.shape)
+        if norm_ord is not None:
+            adv_flat = np.reshape(gradients, newshape=[gradients.shape[0], -1])
+            norms = np.linalg.norm(adv_flat, ord=norm_ord, axis=1, keepdims=True)
+            gradients = np.reshape(adv_flat / norms, newshape=gradients.shape)
+
+        adv_noise = epsilon * gradients
         adv_x = x + adv_noise
-        if clip_min is not None or clip_max is not None:
+        if (clip_min is not None) or (clip_max is not None):
             adv_x = np.clip(adv_x, a_min=clip_min, a_max=clip_max)
         return adv_x
 
@@ -128,7 +131,7 @@ class WhiteBoxAttacks(object):
         gradients = self.get_gradients(x, y, batch_size=batch_size)
         adv_noise = epsilon * np.sign(gradients)
         adv_x = x + adv_noise
-        if clip_min is not None or clip_max is not None:
+        if (clip_min is not None) or (clip_max is not None):
             adv_x = np.clip(adv_x, a_min=clip_min, a_max=clip_max)
         return adv_x
 
