@@ -43,4 +43,14 @@ def get_split_indices(data_size, split=[9, 1], shuffle=True):
 def linear_interpolation(x_start, x_end, num):
     step = (x_end-x_start)/(num+1.)
     x = [x_start + i * step for i in range(num+2)]
+    step = np.reshape(step, newshape=[-1, ])
     return x, np.linalg.norm(step, ord=2)
+
+
+def images_fft(image_list):
+    images = np.array(image_list)
+    f_images = np.fft.fft2(images, axes=(1, 2))
+    f_images = np.fft.fftshift(f_images, axes=(1, 2))
+    A = np.abs(f_images)
+    phi = np.angle(f_images)
+    return A, phi
