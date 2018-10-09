@@ -2,7 +2,7 @@
 This file is used to perform some adversarial attack methods on the deep learning models built with Keras.
 Now involve:
     white-box attack:
-        FGSM, BIM, C&W.
+        L-BFGS-B, FGSM, BIM, C&W.
     black_box attack:
 
 We will update the methods irregularly.
@@ -47,28 +47,33 @@ class WhiteBoxAttacks(object):
     def get_sess(self):
         return self.sess
 
-    def _get_batch_loss(self, x_batch, y_batch, mean=True):
+    def _get_batch_loss(self, x_batch, y_batch, sample_weights=None, mean=True):
         K.set_learning_phase(0)
         num = len(y_batch)
+        if sample_weights is None:
+            sample_weights = np.ones((num,))
         feed_dict = {
             self.input_tensor: x_batch,
             self.target_tensor: y_batch,
-            self._sample_weights: np.ones((len(y_batch),))
+            self._sample_weights: sample_weights
         }
         batch_loss = self.sess.run(self.loss_tensor, feed_dict=feed_dict)
         if not mean:
             batch_loss = num * batch_loss
         return batch_loss
 
-    def _get_batch_gradients(self, x_batch, y_batch):
+    def _get_batch_gradients(self, x_batch, y_batch, sample_weights=None):
         K.set_learning_phase(0)
+        num = len(y_batch)
+        if sample_weights is None:
+            sample_weights = np.ones((num,))
         feed_dict = {
             self.input_tensor: x_batch,
             self.target_tensor: y_batch,
-            self._sample_weights: np.ones((len(y_batch),))
+            self._sample_weights: sample_weights
         }
         gradient_batch = self.sess.run(self.gradient_tensor, feed_dict=feed_dict)
-        gradient_batch = len(y_batch) * gradient_batch  # To remove 1/Batchsize before the loss
+        gradient_batch = num * gradient_batch  # To remove 1/Batchsize before the loss
         return gradient_batch
 
     def get_gradients(self, x, y, batch_size=256):
@@ -148,7 +153,6 @@ class WhiteBoxAttacks(object):
         interval edge.
         :return: adversarial examples of x.
         """
-
         K.set_learning_phase(0)
         if clip_min is None:
             clip_min = -np.Inf
@@ -158,10 +162,10 @@ class WhiteBoxAttacks(object):
         def objective(batch_adv_x, batch_y, batch_x, const):
             batch_adv_x = np.reshape(batch_adv_x, newshape=batch_x.shape)
 
-            class_loss = self._get_batch_loss(x_batch=batch_adv_x, y_batch=batch_y, mean=False)
-            constrain_loss = np.sum(const * np.reshape(np.square(batch_adv_x - batch_x), newshape=[len(batch_x), -1]))
-            class_gradients = self._get_batch_gradients(batch_adv_x, batch_y)
-            constrain_gradients = 2 * const * np.reshape(batch_adv_x - batch_x, newshape=[len(batch_x), -1])
+            class_loss = self._get_batch_loss(x_batch=batch_adv_x, y_batch=batch_y, sample_weights=const, mean=False)
+            constrain_loss = np.sum(np.square(batch_adv_x - batch_x))
+            class_gradients = self._get_batch_gradients(batch_adv_x, batch_y, sample_weights=const)
+            constrain_gradients = 2 * np.reshape(batch_adv_x - batch_x, newshape=[len(batch_x), -1])
 
             loss = class_loss + constrain_loss
             gradients = class_gradients.flatten().astype(float) + constrain_gradients.flatten().astype(float)
@@ -176,14 +180,15 @@ class WhiteBoxAttacks(object):
             x_batch = np.array(x_batch)
             y_batch = np.array(y_batch)
             num = len(y_batch)
-            CONST = np.ones([num, 1]) * initial_const
+            CONST = np.ones([num, ]) * initial_const
 
             min_x_bound = np.ones(x_batch.shape[:]) * clip_min
             max_x_bound = np.ones(x_batch.shape[:]) * clip_max
             clip_bound = list(zip(min_x_bound.flatten(), max_x_bound.flatten()))
+
             # set the lower and upper bounds accordingly
-            lower_bound = np.zeros([num, 1])
-            upper_bound = np.ones([num, 1]) * 1e10
+            lower_bound = np.zeros([num, ])
+            upper_bound = np.ones([num, ]) * 1e10
 
             o_bestl2 = [1e10] * num
             o_bestattack = np.copy(x_batch)

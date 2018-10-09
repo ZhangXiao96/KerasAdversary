@@ -22,7 +22,7 @@ All the files can be found in the folder *lib/*.
 
 This file mainly contains several classes for adversarial attacks.
 
-1. **DLWhiteBoxAttacks**: FGSM, BIM, C&W
+1. **DLWhiteBoxAttacks**: L-BFGS-B, FGSM, BIM, C&W
 3. **DLBlackBoxAttacks**: TODO
 2. **MLWhiteBoxAttacks**: TODO
  
