@@ -18,15 +18,14 @@ To use our library in your project, several libraries are pre-requisites:
 
 All the files can be found in the folder *lib/*.
 
-### AdversarialAttacks.py ###
+### KerasAdversary.py ###
 
 This file mainly contains several classes for adversarial attacks.
 
-1. **DLWhiteBoxAttacks**: L-BFGS-B, FGSM, BIM, C&W
-3. **DLBlackBoxAttacks**: TODO
-2. **MLWhiteBoxAttacks**: TODO
- 
-Now all the attack algorithms are for target attacks.
+1. **WhiteBoxAttacks**: L-BFGS-B, FGSM, BIM, C&W(TODO)
+2. **BlackBoxAttacks**: TODO
+
+Now it supports both target attacks and non-target attacks.
 
 Adversarial attack can be quite simple with our library. For example, if *model* is the target model built with Keras, then it can be attacked by FGSM with the following commands:
 	
@@ -36,6 +35,13 @@ Adversarial attack can be quite simple with our library. For example, if *model*
 	adv_x = AttackAgent.fgsm(x, y, epsilon=0.1, clip_min=0., clip_max=1.)
 
 where *adv_x* are adversarial examples of x.
+
+**NOTE**: If you want to perform **target attacks**, then you should set the parameter **target=True** and **y is your target label**. For example,
+
+	from lib.AdversarialAttacks import WhiteBoxAttacks
+	import keras.backen as K	
+	AttackAgent = WhiteBoxAttacks(model, K.get_session())
+	adv_x = AttackAgent.fgsm(x, y, target=True, epsilon=0.1, clip_min=0., clip_max=1.)
 
 ### visualization.py ###
 
