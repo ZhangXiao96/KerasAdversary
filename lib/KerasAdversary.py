@@ -66,6 +66,7 @@ class WhiteBoxAttacks(object):
 
     def _get_batch_loss(self, x_batch, y_batch, sample_weights=None, mean=True):
         num = len(y_batch)
+        y_batch = np.reshape(y_batch, newshape=(num, -1))
         if sample_weights is None:
             sample_weights = np.ones((num,))
         feed_dict = {
@@ -81,6 +82,7 @@ class WhiteBoxAttacks(object):
 
     def _get_batch_gradients(self, x_batch, y_batch, sample_weights=None):
         num = len(y_batch)
+        y_batch = np.reshape(y_batch, newshape=(num, -1))
         if sample_weights is None:
             sample_weights = np.ones((num,))
         feed_dict = {
