@@ -2,9 +2,9 @@
 This file is used to perform some adversarial attack methods on the deep learning models built with Keras.
 Now involve:
     white-box attack:
-        L-BFGS-B, FGSM, BIM, C&W.
+        L-BFGS-B, FGM, FGSM, BIM, C&W (TODO).
     black_box attack:
-
+        Decision-based Attack (TODO)
 We will update the methods irregularly.
 Please email to xiao_zhang@hust.edu.cn if you have any questions.
 """
@@ -17,7 +17,8 @@ from scipy import optimize
 
 class WhiteBoxAttacks(object):
     """
-    This class provides a simple interface to perform white-box attacks (both target and none-target) on keras models.
+    This class provides a simple interface to perform white-box attacks (both target and none-target) on keras models
+    (better using Tensorflow as your backen).
     For example, if you want to perform FGSM, you can simply use
 
         AttackAgent = WhiteBoxAttacks(target_model, session)
@@ -26,7 +27,7 @@ class WhiteBoxAttacks(object):
     to generate adversarial examples of x.
     """
 
-    def __init__(self, model, sess, loss_fn=None):
+    def __init__(self, model, sess=K.get_session(), loss_fn=None, output_type='probs'):
         """
         To generate the White-box Attack Agent.
         RNN is not supported now.
@@ -35,10 +36,21 @@ class WhiteBoxAttacks(object):
         :param loss_fn: None if using original loss of the model.
                You can also use your own loss function instead, e.g. keras.losses.sparse_categorical_crossentropy
                NOTE: the original loss always involves regular loss!
+        :param output_type: the type of the outputs. "probs" when they are probabilities, while "logits" when they are logits.
         """
         self.model = model
         self.input_tensor = model.inputs[0]
-        self.output_tensor = model.outputs[0]
+
+        if output_type == 'probs':
+            self.probs = model.outputs[0]
+            # TODO: build logits tensor
+            # self.logits =
+        elif output_type == 'logits':
+            self.logits = model.outputs[0]
+            self.probs = K.softmax(self.logits)
+        else:
+            raise Exception('The parameter \'output_type\' must be \'logits\' or \'probs\'')
+
         self.target_tensor = model.targets[0]
         self._sample_weights = model.sample_weights[0]
         if loss_fn is None:
@@ -49,7 +61,7 @@ class WhiteBoxAttacks(object):
         self.sess = sess
 
     def set_loss_function(self, loss_fn):
-        score = loss_fn(self.target_tensor, self.output_tensor)
+        score = loss_fn(self.target_tensor, self.probs)
         ndim = K.ndim(score)
         weight_ndim = K.ndim(self._sample_weights)
         score = K.mean(score, axis=list(range(weight_ndim, ndim)))
@@ -64,9 +76,9 @@ class WhiteBoxAttacks(object):
     def get_sess(self):
         return self.sess
 
-    def _get_batch_loss(self, x_batch, y_batch, sample_weights=None, mean=True):
+    def _get_batch_value(self, fetches, x_batch, y_batch, sample_weights=None):
         num = len(y_batch)
-        y_batch = np.reshape(y_batch, newshape=(num, -1))
+        y_batch = np.reshape(y_batch, newshape=[num, -1])
         if sample_weights is None:
             sample_weights = np.ones((num,))
         feed_dict = {
@@ -75,23 +87,19 @@ class WhiteBoxAttacks(object):
             self._sample_weights: sample_weights,
             K.learning_phase(): 0
         }
-        batch_loss = self.sess.run(self.loss_tensor, feed_dict=feed_dict)
+        values = self.sess.run(fetches=fetches, feed_dict=feed_dict)
+        return values
+
+    def _get_batch_loss(self, x_batch, y_batch, sample_weights=None, mean=True):
+        num = len(y_batch)
+        batch_loss = self._get_batch_value(self.loss_tensor, x_batch, y_batch, sample_weights=sample_weights)
         if not mean:
             batch_loss = num * batch_loss
         return batch_loss
 
     def _get_batch_gradients(self, x_batch, y_batch, sample_weights=None):
         num = len(y_batch)
-        y_batch = np.reshape(y_batch, newshape=(num, -1))
-        if sample_weights is None:
-            sample_weights = np.ones((num,))
-        feed_dict = {
-            self.input_tensor: x_batch,
-            self.target_tensor: y_batch,
-            self._sample_weights: sample_weights,
-            K.learning_phase(): 0
-        }
-        gradient_batch = self.sess.run(self.gradient_tensor, feed_dict=feed_dict)
+        gradient_batch = self._get_batch_value(self.gradient_tensor, x_batch, y_batch, sample_weights=sample_weights)
         gradient_batch = num * gradient_batch  # To remove 1/Batchsize before the loss
         return gradient_batch
 
@@ -325,7 +333,7 @@ class WhiteBoxAttacks(object):
             adv_x = self.fgsm(adv_x, y, target=target, epsilon=epsilon, batch_size=batch_size, clip_min=clip_min, clip_max=clip_max)
         return adv_x
 
-    def carlini_and_wagner(self, x, y):
+    def carlini_and_wagner_l2(self, x, y, target=False, max_iterations=3, batch_size=256, clip_min=0., clip_max=1.):
         """
         Carlini & Wagner (C&W).
         The original paper can be found at: https://arxiv.org/abs/1608.04644
@@ -338,4 +346,47 @@ class WhiteBoxAttacks(object):
           url     = {https://arxiv.org/abs/1608.04644},
         }
         """
-        pass
+        import tensorflow as tf
+
+        def attack_on_batch(x_batch, y_batch, target, max_iterations, batch_size, clip_min, clip_max):
+            # TODO:
+            shape = x_batch.shape
+            w = tf.Variable(np.zeros(shape))
+            target_image = tf.placeholder(shape=shape)
+            new_image = (tf.tanh(w)+1.)/2.0
+            new_image = new_image/(clip_max-clip_min) + clip_min
+
+            adv_batch = self.sess.run(new_image)
+            return adv_batch
+
+        data = zip(x, y)
+        batches = list(utils.batch_iter(data, batchsize=batch_size, shuffle=False))
+        adv_x_list = []
+        for batch in tqdm(batches):
+            x_batch, y_batch = zip(*batch)
+            adv_x_batch = attack_on_batch(x_batch, y_batch, target, max_iterations, batch_size, clip_min, clip_max)
+            adv_x_list.append(adv_x_batch)
+        adv_x = np.concatenate(adv_x_list, axis=0)
+        return adv_x
+
+
+class BlackBoxAttacks(object):
+    """
+        This class provides a simple interface to perform balck-box attacks (both target and none-target) on keras models.
+    """
+
+    def __init__(self, model, sess=K.get_session()):
+        """
+        To generate the Black-box Attack Agent.
+        :param model: the target model which should have the input tensor, the target tensor and the loss tensor.
+        :param sess: the tensorflow session.
+        """
+        self.model = model
+        self.input_tensor = model.inputs[0]
+        self.output_tensor = K.argmax(model.outputs[0], axis=-1)
+        self.sess = sess
+
+    def decision_based_attack(self, x, y, target=False, max_iterations=3, batch_size=256, clip_min=0., clip_max=1.):
+        # TODO:
+        adv_x = None
+        return adv_x
