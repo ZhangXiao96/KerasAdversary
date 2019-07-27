@@ -8,10 +8,10 @@ def get_shuffle_indices(data_size):
 def batch_iter(data, batchsize, shuffle=True):
     data = np.array(list(data))
     data_size = data.shape[0]
-    num_batches = int((data_size-1)/batchsize) + 1
+    num_batches = np.ceil(data_size/batchsize).astype(np.int)
     # Shuffle the data
     if shuffle:
-        shuffle_indices = get_shuffle_indices(data_size)
+        shuffle_indices = shuffle_data(data_size)
         shuffled_data = data[shuffle_indices]
     else:
         shuffled_data = data
